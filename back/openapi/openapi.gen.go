@@ -8,6 +8,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -185,6 +186,9 @@ type ClientWithResponsesInterface interface {
 type GetTestResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON200      *struct {
+		Message *string `json:"message,omitempty"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -223,6 +227,18 @@ func ParseGetTestResponse(rsp *http.Response) (*GetTestResponse, error) {
 	response := &GetTestResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
 	}
 
 	return response, nil
@@ -284,10 +300,11 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/1yOPWsDMQyG/0p4Z3PnNkvRXCilQ5dupcNx97Zn4lrCVrME//fiZItAPAI9+rgglW+F",
-	"XODJMyEwPXHkYeN6QsCZtSUtEDxMET1AjWWxBMFxitMRAbb43saO2dl8FD+8Qo118aTldYPghf4x+gGV",
-	"zbQ0XoceYxzY2NaazG+33t/QRwQ01vEC5PPeeeaZWe2XxQ83CwF/NUOwu5vMc9Z1ybs2l6cYI/pX/w8A",
-	"AP//Mu3RD/AAAAA=",
+	"H4sIAAAAAAAC/1yPMU87MQzFv0r15lMv/38XlBkJIQYWNsQQUtNLm4ut2FSg03135KvEwBD55dk/W29B",
+	"aR+MuMCKVUKE8IX87Y6ULxhwpa6FGyL+7QPWASzUkhREHPZhf8AASTap7xiN1FycaCss1JMVbo9HRDyQ",
+	"vXh/QCcVbkob9D8EL5mbUduwJFJL3sDxrH57geaJ5uRKuq+1cqNnUk0ncklfaZYtw0Sp2oQB9i3+V+ul",
+	"nbCuvw6/nykbVreOpLkXsVvK5yd33VfqHh7xdfkzc09XqiwzNdvdpjDgs1c/bSZxHCvnVCdWi3chBKxv",
+	"608AAAD//8pXRzpqAQAA",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

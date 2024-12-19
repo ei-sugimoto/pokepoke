@@ -12,7 +12,14 @@ type Server struct {
 }
 
 func (s *Server) GetTest(ctx echo.Context) error {
-	return ctx.JSON(200, map[string]string{"message": "health"})
+	message := "health"
+	res := &openapi.GetTestResponse{
+		JSON200: &struct {
+			Message *string "json:\"message,omitempty\""
+		}{Message: &message},
+	}
+
+	return ctx.JSON(200, res.JSON200)
 }
 
 func Serve() {
