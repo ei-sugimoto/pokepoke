@@ -20,6 +20,15 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+// Card defines model for Card.
+type Card struct {
+	Id   *int    `json:"id,omitempty"`
+	Name *string `json:"name,omitempty"`
+}
+
+// PostCardJSONRequestBody defines body for PostCard for application/json ContentType.
+type PostCardJSONRequestBody = Card
+
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
 
@@ -93,8 +102,52 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+	// PostCardWithBody request with any body
+	PostCardWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PostCard(ctx context.Context, body PostCardJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetCards request
+	GetCards(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetTest request
 	GetTest(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+func (c *Client) PostCardWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostCardRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostCard(ctx context.Context, body PostCardJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostCardRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetCards(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetCardsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 func (c *Client) GetTest(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -107,6 +160,73 @@ func (c *Client) GetTest(ctx context.Context, reqEditors ...RequestEditorFn) (*h
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewPostCardRequest calls the generic PostCard builder with application/json body
+func NewPostCardRequest(server string, body PostCardJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostCardRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPostCardRequestWithBody generates requests for PostCard with any type of body
+func NewPostCardRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/card")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetCardsRequest generates requests for GetCards
+func NewGetCardsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/cards")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 // NewGetTestRequest generates requests for GetTest
@@ -179,8 +299,61 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
+	// PostCardWithBodyWithResponse request with any body
+	PostCardWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostCardResponse, error)
+
+	PostCardWithResponse(ctx context.Context, body PostCardJSONRequestBody, reqEditors ...RequestEditorFn) (*PostCardResponse, error)
+
+	// GetCardsWithResponse request
+	GetCardsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetCardsResponse, error)
+
 	// GetTestWithResponse request
 	GetTestWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetTestResponse, error)
+}
+
+type PostCardResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r PostCardResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostCardResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetCardsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Cards *[]Card `json:"cards,omitempty"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetCardsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetCardsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
 }
 
 type GetTestResponse struct {
@@ -207,6 +380,32 @@ func (r GetTestResponse) StatusCode() int {
 	return 0
 }
 
+// PostCardWithBodyWithResponse request with arbitrary body returning *PostCardResponse
+func (c *ClientWithResponses) PostCardWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostCardResponse, error) {
+	rsp, err := c.PostCardWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostCardResponse(rsp)
+}
+
+func (c *ClientWithResponses) PostCardWithResponse(ctx context.Context, body PostCardJSONRequestBody, reqEditors ...RequestEditorFn) (*PostCardResponse, error) {
+	rsp, err := c.PostCard(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostCardResponse(rsp)
+}
+
+// GetCardsWithResponse request returning *GetCardsResponse
+func (c *ClientWithResponses) GetCardsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetCardsResponse, error) {
+	rsp, err := c.GetCards(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetCardsResponse(rsp)
+}
+
 // GetTestWithResponse request returning *GetTestResponse
 func (c *ClientWithResponses) GetTestWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetTestResponse, error) {
 	rsp, err := c.GetTest(ctx, reqEditors...)
@@ -214,6 +413,50 @@ func (c *ClientWithResponses) GetTestWithResponse(ctx context.Context, reqEditor
 		return nil, err
 	}
 	return ParseGetTestResponse(rsp)
+}
+
+// ParsePostCardResponse parses an HTTP response from a PostCardWithResponse call
+func ParsePostCardResponse(rsp *http.Response) (*PostCardResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostCardResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseGetCardsResponse parses an HTTP response from a GetCardsWithResponse call
+func ParseGetCardsResponse(rsp *http.Response) (*GetCardsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetCardsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Cards *[]Card `json:"cards,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
 }
 
 // ParseGetTestResponse parses an HTTP response from a GetTestWithResponse call
@@ -247,6 +490,12 @@ func ParseGetTestResponse(rsp *http.Response) (*GetTestResponse, error) {
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
+	// (POST /card)
+	PostCard(ctx echo.Context) error
+
+	// (GET /cards)
+	GetCards(ctx echo.Context) error
+
 	// (GET /test)
 	GetTest(ctx echo.Context) error
 }
@@ -254,6 +503,24 @@ type ServerInterface interface {
 // ServerInterfaceWrapper converts echo contexts to parameters.
 type ServerInterfaceWrapper struct {
 	Handler ServerInterface
+}
+
+// PostCard converts echo context to params.
+func (w *ServerInterfaceWrapper) PostCard(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.PostCard(ctx)
+	return err
+}
+
+// GetCards converts echo context to params.
+func (w *ServerInterfaceWrapper) GetCards(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetCards(ctx)
+	return err
 }
 
 // GetTest converts echo context to params.
@@ -293,6 +560,8 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 		Handler: si,
 	}
 
+	router.POST(baseURL+"/card", wrapper.PostCard)
+	router.GET(baseURL+"/cards", wrapper.GetCards)
 	router.GET(baseURL+"/test", wrapper.GetTest)
 
 }
@@ -300,11 +569,13 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/1yPMU87MQzFv0r15lMv/38XlBkJIQYWNsQQUtNLm4ut2FSg03135KvEwBD55dk/W29B",
-	"aR+MuMCKVUKE8IX87Y6ULxhwpa6FGyL+7QPWASzUkhREHPZhf8AASTap7xiN1FycaCss1JMVbo9HRDyQ",
-	"vXh/QCcVbkob9D8EL5mbUduwJFJL3sDxrH57geaJ5uRKuq+1cqNnUk0ncklfaZYtw0Sp2oQB9i3+V+ul",
-	"nbCuvw6/nykbVreOpLkXsVvK5yd33VfqHh7xdfkzc09XqiwzNdvdpjDgs1c/bSZxHCvnVCdWi3chBKxv",
-	"608AAAD//8pXRzpqAQAA",
+	"H4sIAAAAAAAC/6ySQW8TQQyF/0plOK6yG3pBc6RICHGAAzfEYTL7mp12dzzY3oqo2v+OZpYEpbRSkDhE",
+	"Hjn2835+fqTAU+aEZErukTQMmHx93njpS8zCGWIRNRtrDj/9lEeQ2zZkhwxyFJNhD6GloeQnnFXRbh53",
+	"Xv0sdKpXk5j2tCynDO/uEIyWkorplouERasCme9Rflc9wj019ADRyIkcbTddmckZyedIjq433eaaGsre",
+	"hvrJbTiSsFqJhcdb5PSxJ0dfWK2yNiT4MUPtHfeHUhc4GVJt8TmPMdSm9k7L4OOuyuu14JYcvWr/LLP9",
+	"vcm2Slemoh4FPTmTGTWhmZOui33TbUvooUFithXuRuANtX9pVpBavMczIB9QOZT+Uu7+iebc8NPMaJj0",
+	"MtqTpV7EH17y+Bz186cjpWG16SXIr+X//8o4QdXvn9zsAD/acOnBPguzNKSQcqvkvj319j0eMHKekOxq",
+	"raKGZhnLaLPs2nbk4MeB1dzbruto+b78CgAA//+QNf4vrwMAAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
