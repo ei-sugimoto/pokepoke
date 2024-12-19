@@ -15,6 +15,7 @@ import (
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"github.com/ei-sugimoto/pokepoke/back/ent/card"
+	"github.com/ei-sugimoto/pokepoke/back/ent/deck"
 )
 
 // Client is the client that holds all ent builders.
@@ -24,6 +25,8 @@ type Client struct {
 	Schema *migrate.Schema
 	// Card is the client for interacting with the Card builders.
 	Card *CardClient
+	// Deck is the client for interacting with the Deck builders.
+	Deck *DeckClient
 }
 
 // NewClient creates a new client configured with the given options.
@@ -36,6 +39,7 @@ func NewClient(opts ...Option) *Client {
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
 	c.Card = NewCardClient(c.config)
+	c.Deck = NewDeckClient(c.config)
 }
 
 type (
@@ -129,6 +133,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ctx:    ctx,
 		config: cfg,
 		Card:   NewCardClient(cfg),
+		Deck:   NewDeckClient(cfg),
 	}, nil
 }
 
@@ -149,6 +154,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ctx:    ctx,
 		config: cfg,
 		Card:   NewCardClient(cfg),
+		Deck:   NewDeckClient(cfg),
 	}, nil
 }
 
@@ -178,12 +184,14 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	c.Card.Use(hooks...)
+	c.Deck.Use(hooks...)
 }
 
 // Intercept adds the query interceptors to all the entity clients.
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	c.Card.Intercept(interceptors...)
+	c.Deck.Intercept(interceptors...)
 }
 
 // Mutate implements the ent.Mutator interface.
@@ -191,6 +199,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 	switch m := m.(type) {
 	case *CardMutation:
 		return c.Card.mutate(ctx, m)
+	case *DeckMutation:
+		return c.Deck.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
 	}
@@ -329,12 +339,145 @@ func (c *CardClient) mutate(ctx context.Context, m *CardMutation) (Value, error)
 	}
 }
 
+// DeckClient is a client for the Deck schema.
+type DeckClient struct {
+	config
+}
+
+// NewDeckClient returns a client for the Deck from the given config.
+func NewDeckClient(c config) *DeckClient {
+	return &DeckClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `deck.Hooks(f(g(h())))`.
+func (c *DeckClient) Use(hooks ...Hook) {
+	c.hooks.Deck = append(c.hooks.Deck, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `deck.Intercept(f(g(h())))`.
+func (c *DeckClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Deck = append(c.inters.Deck, interceptors...)
+}
+
+// Create returns a builder for creating a Deck entity.
+func (c *DeckClient) Create() *DeckCreate {
+	mutation := newDeckMutation(c.config, OpCreate)
+	return &DeckCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Deck entities.
+func (c *DeckClient) CreateBulk(builders ...*DeckCreate) *DeckCreateBulk {
+	return &DeckCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *DeckClient) MapCreateBulk(slice any, setFunc func(*DeckCreate, int)) *DeckCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &DeckCreateBulk{err: fmt.Errorf("calling to DeckClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*DeckCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &DeckCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Deck.
+func (c *DeckClient) Update() *DeckUpdate {
+	mutation := newDeckMutation(c.config, OpUpdate)
+	return &DeckUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *DeckClient) UpdateOne(d *Deck) *DeckUpdateOne {
+	mutation := newDeckMutation(c.config, OpUpdateOne, withDeck(d))
+	return &DeckUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *DeckClient) UpdateOneID(id int) *DeckUpdateOne {
+	mutation := newDeckMutation(c.config, OpUpdateOne, withDeckID(id))
+	return &DeckUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Deck.
+func (c *DeckClient) Delete() *DeckDelete {
+	mutation := newDeckMutation(c.config, OpDelete)
+	return &DeckDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *DeckClient) DeleteOne(d *Deck) *DeckDeleteOne {
+	return c.DeleteOneID(d.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *DeckClient) DeleteOneID(id int) *DeckDeleteOne {
+	builder := c.Delete().Where(deck.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &DeckDeleteOne{builder}
+}
+
+// Query returns a query builder for Deck.
+func (c *DeckClient) Query() *DeckQuery {
+	return &DeckQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeDeck},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Deck entity by its id.
+func (c *DeckClient) Get(ctx context.Context, id int) (*Deck, error) {
+	return c.Query().Where(deck.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *DeckClient) GetX(ctx context.Context, id int) *Deck {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *DeckClient) Hooks() []Hook {
+	return c.hooks.Deck
+}
+
+// Interceptors returns the client interceptors.
+func (c *DeckClient) Interceptors() []Interceptor {
+	return c.inters.Deck
+}
+
+func (c *DeckClient) mutate(ctx context.Context, m *DeckMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&DeckCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&DeckUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&DeckUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&DeckDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Deck mutation op: %q", m.Op())
+	}
+}
+
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		Card []ent.Hook
+		Card, Deck []ent.Hook
 	}
 	inters struct {
-		Card []ent.Interceptor
+		Card, Deck []ent.Interceptor
 	}
 )

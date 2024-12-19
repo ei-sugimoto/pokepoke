@@ -19,9 +19,22 @@ var (
 		Columns:    CardsColumns,
 		PrimaryKey: []*schema.Column{CardsColumns[0]},
 	}
+	// DecksColumns holds the columns for the "decks" table.
+	DecksColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "title", Type: field.TypeString},
+		{Name: "description", Type: field.TypeString},
+	}
+	// DecksTable holds the schema information for the "decks" table.
+	DecksTable = &schema.Table{
+		Name:       "decks",
+		Columns:    DecksColumns,
+		PrimaryKey: []*schema.Column{DecksColumns[0]},
+	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		CardsTable,
+		DecksTable,
 	}
 )
 

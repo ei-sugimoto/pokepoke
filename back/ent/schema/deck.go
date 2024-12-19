@@ -1,0 +1,24 @@
+package schema
+
+import (
+	"entgo.io/ent"
+	"entgo.io/ent/schema/field"
+)
+
+// Deck holds the schema definition for the Deck entity.
+type Deck struct {
+	ent.Schema
+}
+
+// Fields of the Deck.
+func (Deck) Fields() []ent.Field {
+	return []ent.Field{
+		field.String("title"),
+		field.String("description"),
+	}
+}
+
+// Edges of the Deck.
+func (Deck) Edges() []ent.Edge {
+	return nil
+}

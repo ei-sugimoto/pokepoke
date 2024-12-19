@@ -14,6 +14,8 @@ type Tx struct {
 	config
 	// Card is the client for interacting with the Card builders.
 	Card *CardClient
+	// Deck is the client for interacting with the Deck builders.
+	Deck *DeckClient
 
 	// lazily loaded.
 	client     *Client
@@ -146,6 +148,7 @@ func (tx *Tx) Client() *Client {
 
 func (tx *Tx) init() {
 	tx.Card = NewCardClient(tx.config)
+	tx.Deck = NewDeckClient(tx.config)
 }
 
 // txDriver wraps the given dialect.Tx with a nop dialect.Driver implementation.
