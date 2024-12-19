@@ -4,6 +4,7 @@ package card
 
 import (
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/ei-sugimoto/pokepoke/back/ent/predicate"
 )
 
@@ -120,6 +121,29 @@ func NameEqualFold(v string) predicate.Card {
 // NameContainsFold applies the ContainsFold predicate on the "name" field.
 func NameContainsFold(v string) predicate.Card {
 	return predicate.Card(sql.FieldContainsFold(FieldName, v))
+}
+
+// HasDeck applies the HasEdge predicate on the "deck" edge.
+func HasDeck() predicate.Card {
+	return predicate.Card(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, DeckTable, DeckColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasDeckWith applies the HasEdge predicate on the "deck" edge with a given conditions (other predicates).
+func HasDeckWith(preds ...predicate.Deck) predicate.Card {
+	return predicate.Card(func(s *sql.Selector) {
+		step := newDeckStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
 }
 
 // And groups predicates with the AND operator between them.

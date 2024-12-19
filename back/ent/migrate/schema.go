@@ -12,12 +12,21 @@ var (
 	CardsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "name", Type: field.TypeString},
+		{Name: "deck_cards", Type: field.TypeInt, Nullable: true},
 	}
 	// CardsTable holds the schema information for the "cards" table.
 	CardsTable = &schema.Table{
 		Name:       "cards",
 		Columns:    CardsColumns,
 		PrimaryKey: []*schema.Column{CardsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "cards_decks_cards",
+				Columns:    []*schema.Column{CardsColumns[2]},
+				RefColumns: []*schema.Column{DecksColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
 	}
 	// DecksColumns holds the columns for the "decks" table.
 	DecksColumns = []*schema.Column{
@@ -39,4 +48,5 @@ var (
 )
 
 func init() {
+	CardsTable.ForeignKeys[0].RefTable = DecksTable
 }

@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/ei-sugimoto/pokepoke/back/ent/card"
 	"github.com/ei-sugimoto/pokepoke/back/ent/deck"
 	"github.com/ei-sugimoto/pokepoke/back/ent/predicate"
 )
@@ -55,9 +56,45 @@ func (du *DeckUpdate) SetNillableDescription(s *string) *DeckUpdate {
 	return du
 }
 
+// AddCardIDs adds the "cards" edge to the Card entity by IDs.
+func (du *DeckUpdate) AddCardIDs(ids ...int) *DeckUpdate {
+	du.mutation.AddCardIDs(ids...)
+	return du
+}
+
+// AddCards adds the "cards" edges to the Card entity.
+func (du *DeckUpdate) AddCards(c ...*Card) *DeckUpdate {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
+	}
+	return du.AddCardIDs(ids...)
+}
+
 // Mutation returns the DeckMutation object of the builder.
 func (du *DeckUpdate) Mutation() *DeckMutation {
 	return du.mutation
+}
+
+// ClearCards clears all "cards" edges to the Card entity.
+func (du *DeckUpdate) ClearCards() *DeckUpdate {
+	du.mutation.ClearCards()
+	return du
+}
+
+// RemoveCardIDs removes the "cards" edge to Card entities by IDs.
+func (du *DeckUpdate) RemoveCardIDs(ids ...int) *DeckUpdate {
+	du.mutation.RemoveCardIDs(ids...)
+	return du
+}
+
+// RemoveCards removes "cards" edges to Card entities.
+func (du *DeckUpdate) RemoveCards(c ...*Card) *DeckUpdate {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
+	}
+	return du.RemoveCardIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -101,6 +138,51 @@ func (du *DeckUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := du.mutation.Description(); ok {
 		_spec.SetField(deck.FieldDescription, field.TypeString, value)
+	}
+	if du.mutation.CardsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   deck.CardsTable,
+			Columns: []string{deck.CardsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(card.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := du.mutation.RemovedCardsIDs(); len(nodes) > 0 && !du.mutation.CardsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   deck.CardsTable,
+			Columns: []string{deck.CardsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(card.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := du.mutation.CardsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   deck.CardsTable,
+			Columns: []string{deck.CardsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(card.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if n, err = sqlgraph.UpdateNodes(ctx, du.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -150,9 +232,45 @@ func (duo *DeckUpdateOne) SetNillableDescription(s *string) *DeckUpdateOne {
 	return duo
 }
 
+// AddCardIDs adds the "cards" edge to the Card entity by IDs.
+func (duo *DeckUpdateOne) AddCardIDs(ids ...int) *DeckUpdateOne {
+	duo.mutation.AddCardIDs(ids...)
+	return duo
+}
+
+// AddCards adds the "cards" edges to the Card entity.
+func (duo *DeckUpdateOne) AddCards(c ...*Card) *DeckUpdateOne {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
+	}
+	return duo.AddCardIDs(ids...)
+}
+
 // Mutation returns the DeckMutation object of the builder.
 func (duo *DeckUpdateOne) Mutation() *DeckMutation {
 	return duo.mutation
+}
+
+// ClearCards clears all "cards" edges to the Card entity.
+func (duo *DeckUpdateOne) ClearCards() *DeckUpdateOne {
+	duo.mutation.ClearCards()
+	return duo
+}
+
+// RemoveCardIDs removes the "cards" edge to Card entities by IDs.
+func (duo *DeckUpdateOne) RemoveCardIDs(ids ...int) *DeckUpdateOne {
+	duo.mutation.RemoveCardIDs(ids...)
+	return duo
+}
+
+// RemoveCards removes "cards" edges to Card entities.
+func (duo *DeckUpdateOne) RemoveCards(c ...*Card) *DeckUpdateOne {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
+	}
+	return duo.RemoveCardIDs(ids...)
 }
 
 // Where appends a list predicates to the DeckUpdate builder.
@@ -226,6 +344,51 @@ func (duo *DeckUpdateOne) sqlSave(ctx context.Context) (_node *Deck, err error) 
 	}
 	if value, ok := duo.mutation.Description(); ok {
 		_spec.SetField(deck.FieldDescription, field.TypeString, value)
+	}
+	if duo.mutation.CardsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   deck.CardsTable,
+			Columns: []string{deck.CardsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(card.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := duo.mutation.RemovedCardsIDs(); len(nodes) > 0 && !duo.mutation.CardsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   deck.CardsTable,
+			Columns: []string{deck.CardsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(card.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := duo.mutation.CardsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   deck.CardsTable,
+			Columns: []string{deck.CardsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(card.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &Deck{config: duo.config}
 	_spec.Assign = _node.assignValues

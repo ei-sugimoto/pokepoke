@@ -19,8 +19,29 @@ type Deck struct {
 	// Title holds the value of the "title" field.
 	Title string `json:"title,omitempty"`
 	// Description holds the value of the "description" field.
-	Description  string `json:"description,omitempty"`
+	Description string `json:"description,omitempty"`
+	// Edges holds the relations/edges for other nodes in the graph.
+	// The values are being populated by the DeckQuery when eager-loading is set.
+	Edges        DeckEdges `json:"edges"`
 	selectValues sql.SelectValues
+}
+
+// DeckEdges holds the relations/edges for other nodes in the graph.
+type DeckEdges struct {
+	// Cards holds the value of the cards edge.
+	Cards []*Card `json:"cards,omitempty"`
+	// loadedTypes holds the information for reporting if a
+	// type was loaded (or requested) in eager-loading or not.
+	loadedTypes [1]bool
+}
+
+// CardsOrErr returns the Cards value or an error if the edge
+// was not loaded in eager-loading.
+func (e DeckEdges) CardsOrErr() ([]*Card, error) {
+	if e.loadedTypes[0] {
+		return e.Cards, nil
+	}
+	return nil, &NotLoadedError{edge: "cards"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -76,6 +97,11 @@ func (d *Deck) assignValues(columns []string, values []any) error {
 // This includes values selected through modifiers, order, etc.
 func (d *Deck) Value(name string) (ent.Value, error) {
 	return d.selectValues.Get(name)
+}
+
+// QueryCards queries the "cards" edge of the Deck entity.
+func (d *Deck) QueryCards() *CardQuery {
+	return NewDeckClient(d.config).QueryCards(d)
 }
 
 // Update returns a builder for updating this Deck.

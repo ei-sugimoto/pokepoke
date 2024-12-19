@@ -9,6 +9,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/ei-sugimoto/pokepoke/back/ent/card"
+	"github.com/ei-sugimoto/pokepoke/back/ent/deck"
 )
 
 // Card is the model entity for the Card schema.
@@ -17,8 +18,32 @@ type Card struct {
 	// ID of the ent.
 	ID int `json:"id,omitempty"`
 	// Name holds the value of the "name" field.
-	Name         string `json:"name,omitempty"`
+	Name string `json:"name,omitempty"`
+	// Edges holds the relations/edges for other nodes in the graph.
+	// The values are being populated by the CardQuery when eager-loading is set.
+	Edges        CardEdges `json:"edges"`
+	deck_cards   *int
 	selectValues sql.SelectValues
+}
+
+// CardEdges holds the relations/edges for other nodes in the graph.
+type CardEdges struct {
+	// Deck holds the value of the deck edge.
+	Deck *Deck `json:"deck,omitempty"`
+	// loadedTypes holds the information for reporting if a
+	// type was loaded (or requested) in eager-loading or not.
+	loadedTypes [1]bool
+}
+
+// DeckOrErr returns the Deck value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e CardEdges) DeckOrErr() (*Deck, error) {
+	if e.Deck != nil {
+		return e.Deck, nil
+	} else if e.loadedTypes[0] {
+		return nil, &NotFoundError{label: deck.Label}
+	}
+	return nil, &NotLoadedError{edge: "deck"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -30,6 +55,8 @@ func (*Card) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullInt64)
 		case card.FieldName:
 			values[i] = new(sql.NullString)
+		case card.ForeignKeys[0]: // deck_cards
+			values[i] = new(sql.NullInt64)
 		default:
 			values[i] = new(sql.UnknownType)
 		}
@@ -57,6 +84,13 @@ func (c *Card) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				c.Name = value.String
 			}
+		case card.ForeignKeys[0]:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for edge-field deck_cards", value)
+			} else if value.Valid {
+				c.deck_cards = new(int)
+				*c.deck_cards = int(value.Int64)
+			}
 		default:
 			c.selectValues.Set(columns[i], values[i])
 		}
@@ -68,6 +102,11 @@ func (c *Card) assignValues(columns []string, values []any) error {
 // This includes values selected through modifiers, order, etc.
 func (c *Card) Value(name string) (ent.Value, error) {
 	return c.selectValues.Get(name)
+}
+
+// QueryDeck queries the "deck" edge of the Card entity.
+func (c *Card) QueryDeck() *DeckQuery {
+	return NewCardClient(c.config).QueryDeck(c)
 }
 
 // Update returns a builder for updating this Card.

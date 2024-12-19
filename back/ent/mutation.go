@@ -36,6 +36,8 @@ type CardMutation struct {
 	id            *int
 	name          *string
 	clearedFields map[string]struct{}
+	deck          *int
+	cleareddeck   bool
 	done          bool
 	oldValue      func(context.Context) (*Card, error)
 	predicates    []predicate.Card
@@ -175,6 +177,45 @@ func (m *CardMutation) ResetName() {
 	m.name = nil
 }
 
+// SetDeckID sets the "deck" edge to the Deck entity by id.
+func (m *CardMutation) SetDeckID(id int) {
+	m.deck = &id
+}
+
+// ClearDeck clears the "deck" edge to the Deck entity.
+func (m *CardMutation) ClearDeck() {
+	m.cleareddeck = true
+}
+
+// DeckCleared reports if the "deck" edge to the Deck entity was cleared.
+func (m *CardMutation) DeckCleared() bool {
+	return m.cleareddeck
+}
+
+// DeckID returns the "deck" edge ID in the mutation.
+func (m *CardMutation) DeckID() (id int, exists bool) {
+	if m.deck != nil {
+		return *m.deck, true
+	}
+	return
+}
+
+// DeckIDs returns the "deck" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// DeckID instead. It exists only for internal usage by the builders.
+func (m *CardMutation) DeckIDs() (ids []int) {
+	if id := m.deck; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetDeck resets all changes to the "deck" edge.
+func (m *CardMutation) ResetDeck() {
+	m.deck = nil
+	m.cleareddeck = false
+}
+
 // Where appends a list predicates to the CardMutation builder.
 func (m *CardMutation) Where(ps ...predicate.Card) {
 	m.predicates = append(m.predicates, ps...)
@@ -308,19 +349,28 @@ func (m *CardMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *CardMutation) AddedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
+	if m.deck != nil {
+		edges = append(edges, card.EdgeDeck)
+	}
 	return edges
 }
 
 // AddedIDs returns all IDs (to other nodes) that were added for the given edge
 // name in this mutation.
 func (m *CardMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case card.EdgeDeck:
+		if id := m.deck; id != nil {
+			return []ent.Value{*id}
+		}
+	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *CardMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
 	return edges
 }
 
@@ -332,25 +382,42 @@ func (m *CardMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *CardMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
+	if m.cleareddeck {
+		edges = append(edges, card.EdgeDeck)
+	}
 	return edges
 }
 
 // EdgeCleared returns a boolean which indicates if the edge with the given name
 // was cleared in this mutation.
 func (m *CardMutation) EdgeCleared(name string) bool {
+	switch name {
+	case card.EdgeDeck:
+		return m.cleareddeck
+	}
 	return false
 }
 
 // ClearEdge clears the value of the edge with the given name. It returns an error
 // if that edge is not defined in the schema.
 func (m *CardMutation) ClearEdge(name string) error {
+	switch name {
+	case card.EdgeDeck:
+		m.ClearDeck()
+		return nil
+	}
 	return fmt.Errorf("unknown Card unique edge %s", name)
 }
 
 // ResetEdge resets all changes to the edge with the given name in this mutation.
 // It returns an error if the edge is not defined in the schema.
 func (m *CardMutation) ResetEdge(name string) error {
+	switch name {
+	case card.EdgeDeck:
+		m.ResetDeck()
+		return nil
+	}
 	return fmt.Errorf("unknown Card edge %s", name)
 }
 
@@ -363,6 +430,9 @@ type DeckMutation struct {
 	title         *string
 	description   *string
 	clearedFields map[string]struct{}
+	cards         map[int]struct{}
+	removedcards  map[int]struct{}
+	clearedcards  bool
 	done          bool
 	oldValue      func(context.Context) (*Deck, error)
 	predicates    []predicate.Deck
@@ -538,6 +608,60 @@ func (m *DeckMutation) ResetDescription() {
 	m.description = nil
 }
 
+// AddCardIDs adds the "cards" edge to the Card entity by ids.
+func (m *DeckMutation) AddCardIDs(ids ...int) {
+	if m.cards == nil {
+		m.cards = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.cards[ids[i]] = struct{}{}
+	}
+}
+
+// ClearCards clears the "cards" edge to the Card entity.
+func (m *DeckMutation) ClearCards() {
+	m.clearedcards = true
+}
+
+// CardsCleared reports if the "cards" edge to the Card entity was cleared.
+func (m *DeckMutation) CardsCleared() bool {
+	return m.clearedcards
+}
+
+// RemoveCardIDs removes the "cards" edge to the Card entity by IDs.
+func (m *DeckMutation) RemoveCardIDs(ids ...int) {
+	if m.removedcards == nil {
+		m.removedcards = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.cards, ids[i])
+		m.removedcards[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedCards returns the removed IDs of the "cards" edge to the Card entity.
+func (m *DeckMutation) RemovedCardsIDs() (ids []int) {
+	for id := range m.removedcards {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// CardsIDs returns the "cards" edge IDs in the mutation.
+func (m *DeckMutation) CardsIDs() (ids []int) {
+	for id := range m.cards {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetCards resets all changes to the "cards" edge.
+func (m *DeckMutation) ResetCards() {
+	m.cards = nil
+	m.clearedcards = false
+	m.removedcards = nil
+}
+
 // Where appends a list predicates to the DeckMutation builder.
 func (m *DeckMutation) Where(ps ...predicate.Deck) {
 	m.predicates = append(m.predicates, ps...)
@@ -688,48 +812,84 @@ func (m *DeckMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *DeckMutation) AddedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
+	if m.cards != nil {
+		edges = append(edges, deck.EdgeCards)
+	}
 	return edges
 }
 
 // AddedIDs returns all IDs (to other nodes) that were added for the given edge
 // name in this mutation.
 func (m *DeckMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case deck.EdgeCards:
+		ids := make([]ent.Value, 0, len(m.cards))
+		for id := range m.cards {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *DeckMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
+	if m.removedcards != nil {
+		edges = append(edges, deck.EdgeCards)
+	}
 	return edges
 }
 
 // RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
 // the given name in this mutation.
 func (m *DeckMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case deck.EdgeCards:
+		ids := make([]ent.Value, 0, len(m.removedcards))
+		for id := range m.removedcards {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *DeckMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
+	if m.clearedcards {
+		edges = append(edges, deck.EdgeCards)
+	}
 	return edges
 }
 
 // EdgeCleared returns a boolean which indicates if the edge with the given name
 // was cleared in this mutation.
 func (m *DeckMutation) EdgeCleared(name string) bool {
+	switch name {
+	case deck.EdgeCards:
+		return m.clearedcards
+	}
 	return false
 }
 
 // ClearEdge clears the value of the edge with the given name. It returns an error
 // if that edge is not defined in the schema.
 func (m *DeckMutation) ClearEdge(name string) error {
+	switch name {
+	}
 	return fmt.Errorf("unknown Deck unique edge %s", name)
 }
 
 // ResetEdge resets all changes to the edge with the given name in this mutation.
 // It returns an error if the edge is not defined in the schema.
 func (m *DeckMutation) ResetEdge(name string) error {
+	switch name {
+	case deck.EdgeCards:
+		m.ResetCards()
+		return nil
+	}
 	return fmt.Errorf("unknown Deck edge %s", name)
 }

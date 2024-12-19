@@ -14,6 +14,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/ei-sugimoto/pokepoke/back/ent/card"
 	"github.com/ei-sugimoto/pokepoke/back/ent/deck"
 )
@@ -314,6 +315,22 @@ func (c *CardClient) GetX(ctx context.Context, id int) *Card {
 	return obj
 }
 
+// QueryDeck queries the deck edge of a Card.
+func (c *CardClient) QueryDeck(ca *Card) *DeckQuery {
+	query := (&DeckClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := ca.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(card.Table, card.FieldID, id),
+			sqlgraph.To(deck.Table, deck.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, card.DeckTable, card.DeckColumn),
+		)
+		fromV = sqlgraph.Neighbors(ca.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *CardClient) Hooks() []Hook {
 	return c.hooks.Card
@@ -445,6 +462,22 @@ func (c *DeckClient) GetX(ctx context.Context, id int) *Deck {
 		panic(err)
 	}
 	return obj
+}
+
+// QueryCards queries the cards edge of a Deck.
+func (c *DeckClient) QueryCards(d *Deck) *CardQuery {
+	query := (&CardClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := d.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(deck.Table, deck.FieldID, id),
+			sqlgraph.To(card.Table, card.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, deck.CardsTable, deck.CardsColumn),
+		)
+		fromV = sqlgraph.Neighbors(d.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
 }
 
 // Hooks returns the client hooks.

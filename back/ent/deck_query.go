@@ -4,6 +4,7 @@ package ent
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math"
 
@@ -11,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/ei-sugimoto/pokepoke/back/ent/card"
 	"github.com/ei-sugimoto/pokepoke/back/ent/deck"
 	"github.com/ei-sugimoto/pokepoke/back/ent/predicate"
 )
@@ -22,6 +24,7 @@ type DeckQuery struct {
 	order      []deck.OrderOption
 	inters     []Interceptor
 	predicates []predicate.Deck
+	withCards  *CardQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -56,6 +59,28 @@ func (dq *DeckQuery) Unique(unique bool) *DeckQuery {
 func (dq *DeckQuery) Order(o ...deck.OrderOption) *DeckQuery {
 	dq.order = append(dq.order, o...)
 	return dq
+}
+
+// QueryCards chains the current query on the "cards" edge.
+func (dq *DeckQuery) QueryCards() *CardQuery {
+	query := (&CardClient{config: dq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := dq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := dq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(deck.Table, deck.FieldID, selector),
+			sqlgraph.To(card.Table, card.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, deck.CardsTable, deck.CardsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(dq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // First returns the first Deck entity from the query.
@@ -250,10 +275,22 @@ func (dq *DeckQuery) Clone() *DeckQuery {
 		order:      append([]deck.OrderOption{}, dq.order...),
 		inters:     append([]Interceptor{}, dq.inters...),
 		predicates: append([]predicate.Deck{}, dq.predicates...),
+		withCards:  dq.withCards.Clone(),
 		// clone intermediate query.
 		sql:  dq.sql.Clone(),
 		path: dq.path,
 	}
+}
+
+// WithCards tells the query-builder to eager-load the nodes that are connected to
+// the "cards" edge. The optional arguments are used to configure the query builder of the edge.
+func (dq *DeckQuery) WithCards(opts ...func(*CardQuery)) *DeckQuery {
+	query := (&CardClient{config: dq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	dq.withCards = query
+	return dq
 }
 
 // GroupBy is used to group vertices by one or more fields/columns.
@@ -332,8 +369,11 @@ func (dq *DeckQuery) prepareQuery(ctx context.Context) error {
 
 func (dq *DeckQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Deck, error) {
 	var (
-		nodes = []*Deck{}
-		_spec = dq.querySpec()
+		nodes       = []*Deck{}
+		_spec       = dq.querySpec()
+		loadedTypes = [1]bool{
+			dq.withCards != nil,
+		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*Deck).scanValues(nil, columns)
@@ -341,6 +381,7 @@ func (dq *DeckQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Deck, e
 	_spec.Assign = func(columns []string, values []any) error {
 		node := &Deck{config: dq.config}
 		nodes = append(nodes, node)
+		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
 	for i := range hooks {
@@ -352,7 +393,46 @@ func (dq *DeckQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Deck, e
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
+	if query := dq.withCards; query != nil {
+		if err := dq.loadCards(ctx, query, nodes,
+			func(n *Deck) { n.Edges.Cards = []*Card{} },
+			func(n *Deck, e *Card) { n.Edges.Cards = append(n.Edges.Cards, e) }); err != nil {
+			return nil, err
+		}
+	}
 	return nodes, nil
+}
+
+func (dq *DeckQuery) loadCards(ctx context.Context, query *CardQuery, nodes []*Deck, init func(*Deck), assign func(*Deck, *Card)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Deck)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	query.withFKs = true
+	query.Where(predicate.Card(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(deck.CardsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.deck_cards
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "deck_cards" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "deck_cards" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
 }
 
 func (dq *DeckQuery) sqlCount(ctx context.Context) (int, error) {

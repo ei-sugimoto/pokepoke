@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/ei-sugimoto/pokepoke/back/ent/card"
+	"github.com/ei-sugimoto/pokepoke/back/ent/deck"
 	"github.com/ei-sugimoto/pokepoke/back/ent/predicate"
 )
 
@@ -41,9 +42,34 @@ func (cu *CardUpdate) SetNillableName(s *string) *CardUpdate {
 	return cu
 }
 
+// SetDeckID sets the "deck" edge to the Deck entity by ID.
+func (cu *CardUpdate) SetDeckID(id int) *CardUpdate {
+	cu.mutation.SetDeckID(id)
+	return cu
+}
+
+// SetNillableDeckID sets the "deck" edge to the Deck entity by ID if the given value is not nil.
+func (cu *CardUpdate) SetNillableDeckID(id *int) *CardUpdate {
+	if id != nil {
+		cu = cu.SetDeckID(*id)
+	}
+	return cu
+}
+
+// SetDeck sets the "deck" edge to the Deck entity.
+func (cu *CardUpdate) SetDeck(d *Deck) *CardUpdate {
+	return cu.SetDeckID(d.ID)
+}
+
 // Mutation returns the CardMutation object of the builder.
 func (cu *CardUpdate) Mutation() *CardMutation {
 	return cu.mutation
+}
+
+// ClearDeck clears the "deck" edge to the Deck entity.
+func (cu *CardUpdate) ClearDeck() *CardUpdate {
+	cu.mutation.ClearDeck()
+	return cu
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -85,6 +111,35 @@ func (cu *CardUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := cu.mutation.Name(); ok {
 		_spec.SetField(card.FieldName, field.TypeString, value)
 	}
+	if cu.mutation.DeckCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   card.DeckTable,
+			Columns: []string{card.DeckColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(deck.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := cu.mutation.DeckIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   card.DeckTable,
+			Columns: []string{card.DeckColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(deck.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if n, err = sqlgraph.UpdateNodes(ctx, cu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{card.Label}
@@ -119,9 +174,34 @@ func (cuo *CardUpdateOne) SetNillableName(s *string) *CardUpdateOne {
 	return cuo
 }
 
+// SetDeckID sets the "deck" edge to the Deck entity by ID.
+func (cuo *CardUpdateOne) SetDeckID(id int) *CardUpdateOne {
+	cuo.mutation.SetDeckID(id)
+	return cuo
+}
+
+// SetNillableDeckID sets the "deck" edge to the Deck entity by ID if the given value is not nil.
+func (cuo *CardUpdateOne) SetNillableDeckID(id *int) *CardUpdateOne {
+	if id != nil {
+		cuo = cuo.SetDeckID(*id)
+	}
+	return cuo
+}
+
+// SetDeck sets the "deck" edge to the Deck entity.
+func (cuo *CardUpdateOne) SetDeck(d *Deck) *CardUpdateOne {
+	return cuo.SetDeckID(d.ID)
+}
+
 // Mutation returns the CardMutation object of the builder.
 func (cuo *CardUpdateOne) Mutation() *CardMutation {
 	return cuo.mutation
+}
+
+// ClearDeck clears the "deck" edge to the Deck entity.
+func (cuo *CardUpdateOne) ClearDeck() *CardUpdateOne {
+	cuo.mutation.ClearDeck()
+	return cuo
 }
 
 // Where appends a list predicates to the CardUpdate builder.
@@ -192,6 +272,35 @@ func (cuo *CardUpdateOne) sqlSave(ctx context.Context) (_node *Card, err error) 
 	}
 	if value, ok := cuo.mutation.Name(); ok {
 		_spec.SetField(card.FieldName, field.TypeString, value)
+	}
+	if cuo.mutation.DeckCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   card.DeckTable,
+			Columns: []string{card.DeckColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(deck.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := cuo.mutation.DeckIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   card.DeckTable,
+			Columns: []string{card.DeckColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(deck.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &Card{config: cuo.config}
 	_spec.Assign = _node.assignValues

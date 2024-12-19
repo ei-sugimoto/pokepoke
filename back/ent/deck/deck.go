@@ -4,6 +4,7 @@ package deck
 
 import (
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 )
 
 const (
@@ -15,8 +16,17 @@ const (
 	FieldTitle = "title"
 	// FieldDescription holds the string denoting the description field in the database.
 	FieldDescription = "description"
+	// EdgeCards holds the string denoting the cards edge name in mutations.
+	EdgeCards = "cards"
 	// Table holds the table name of the deck in the database.
 	Table = "decks"
+	// CardsTable is the table that holds the cards relation/edge.
+	CardsTable = "cards"
+	// CardsInverseTable is the table name for the Card entity.
+	// It exists in this package in order to avoid circular dependency with the "card" package.
+	CardsInverseTable = "cards"
+	// CardsColumn is the table column denoting the cards relation/edge.
+	CardsColumn = "deck_cards"
 )
 
 // Columns holds all SQL columns for deck fields.
@@ -52,4 +62,25 @@ func ByTitle(opts ...sql.OrderTermOption) OrderOption {
 // ByDescription orders the results by the description field.
 func ByDescription(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDescription, opts...).ToFunc()
+}
+
+// ByCardsCount orders the results by cards count.
+func ByCardsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newCardsStep(), opts...)
+	}
+}
+
+// ByCards orders the results by cards terms.
+func ByCards(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newCardsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+func newCardsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(CardsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, CardsTable, CardsColumn),
+	)
 }

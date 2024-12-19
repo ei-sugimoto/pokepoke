@@ -9,6 +9,7 @@ import (
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/ei-sugimoto/pokepoke/back/ent/card"
 	"github.com/ei-sugimoto/pokepoke/back/ent/deck"
 )
 
@@ -29,6 +30,21 @@ func (dc *DeckCreate) SetTitle(s string) *DeckCreate {
 func (dc *DeckCreate) SetDescription(s string) *DeckCreate {
 	dc.mutation.SetDescription(s)
 	return dc
+}
+
+// AddCardIDs adds the "cards" edge to the Card entity by IDs.
+func (dc *DeckCreate) AddCardIDs(ids ...int) *DeckCreate {
+	dc.mutation.AddCardIDs(ids...)
+	return dc
+}
+
+// AddCards adds the "cards" edges to the Card entity.
+func (dc *DeckCreate) AddCards(c ...*Card) *DeckCreate {
+	ids := make([]int, len(c))
+	for i := range c {
+		ids[i] = c[i].ID
+	}
+	return dc.AddCardIDs(ids...)
 }
 
 // Mutation returns the DeckMutation object of the builder.
@@ -104,6 +120,22 @@ func (dc *DeckCreate) createSpec() (*Deck, *sqlgraph.CreateSpec) {
 	if value, ok := dc.mutation.Description(); ok {
 		_spec.SetField(deck.FieldDescription, field.TypeString, value)
 		_node.Description = value
+	}
+	if nodes := dc.mutation.CardsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   deck.CardsTable,
+			Columns: []string{deck.CardsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(card.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
 }
