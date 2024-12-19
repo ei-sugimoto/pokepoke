@@ -10,7 +10,7 @@ import (
 )
 
 func Migration() {
-	fmt.Println("migration")
+	log.Println("start migration")
 
 	client := infra.Conn()
 	defer client.Close()
@@ -19,4 +19,5 @@ func Migration() {
 		log.Fatalf("failed to create schema: %v", err)
 	}
 
+	fmt.Println("migration success")
 }

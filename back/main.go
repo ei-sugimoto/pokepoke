@@ -1,37 +1,50 @@
 package main
 
 import (
-	"fmt"
+	"os"
 
 	"github.com/ei-sugimoto/pokepoke/back/cmd"
-	"github.com/ei-sugimoto/pokepoke/back/openapi"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/urfave/cli"
 )
 
-var _ openapi.ServerInterface = (*Server)(nil)
-
-type Server struct {
-}
-
-func (s *Server) GetTest(ctx echo.Context) error {
-	return ctx.JSON(200, map[string]string{"message": "health"})
-}
-
 func main() {
-	fmt.Println("hello, world")
+	var (
+		suffix string
+	)
 
-	cmd.Migration()
+	app := cli.NewApp()
+	app.Name = "pokepoke"
+	app.Usage = "pokepoke"
+	app.Version = "0.1.0"
 
-	e := echo.New()
-	e.Use(middleware.Logger())
-	e.Use(middleware.Recover())
-	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: []string{"http://front:3000"},
-		AllowMethods: []string{echo.GET, echo.HEAD, echo.PUT, echo.PATCH, echo.POST, echo.DELETE},
-	}))
-	server := &Server{}
-	openapi.RegisterHandlers(e, server)
+	app.Flags = []cli.Flag{
+		cli.StringFlag{
+			Name:        "suffix",
+			Value:       "default",
+			Usage:       "suffix",
+			Destination: &suffix,
+			EnvVar:      "SUFFIX",
+		},
+	}
 
-	e.Logger.Fatal(e.Start(":8000"))
+	app.Commands = []cli.Command{
+		{
+			Name:  "serve",
+			Usage: "serve",
+			Action: func(c *cli.Context) error {
+				cmd.Serve()
+				return nil
+			},
+		},
+		{
+			Name:  "migration",
+			Usage: "migration",
+			Action: func(c *cli.Context) error {
+				cmd.Migration()
+				return nil
+			},
+		},
+	}
+
+	app.Run(os.Args)
 }
