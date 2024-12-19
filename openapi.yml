@@ -1,0 +1,13 @@
+openapi: '3.0.3'
+info:
+  title: pokepoke deck
+  version: '1.0'
+servers:
+  - url: http://localhost:8000
+    description: Development server
+paths:
+  /test:
+    get:
+      responses:
+        '200':
+          description: OK
