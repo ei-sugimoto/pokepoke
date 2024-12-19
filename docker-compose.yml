@@ -13,6 +13,7 @@ services:
       - NODE_ENV=development
     depends_on:
       - back
+      - db
   back:
     build:
       context: ./back
@@ -22,3 +23,23 @@ services:
       - '8000:8000'
     volumes:
       - ./back:/app
+    depends_on:
+      - db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=pokepoke
+
+  db:
+    image: postgres:14.15-alpine
+    ports:
+      - '5432:5432'
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=pokepoke
+    volumes:
+      - pokepokedb:/var/lib/postgresql/data
+
+volumes:
+  pokepokedb:

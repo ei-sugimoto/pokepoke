@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/ei-sugimoto/pokepoke/back/cmd"
 	"github.com/ei-sugimoto/pokepoke/back/openapi"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -19,6 +20,8 @@ func (s *Server) GetTest(ctx echo.Context) error {
 
 func main() {
 	fmt.Println("hello, world")
+
+	cmd.Migration()
 
 	e := echo.New()
 	e.Use(middleware.Logger())
